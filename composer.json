@@ -105,7 +105,7 @@
         "sonata-project/exporter": "^1.7",
         "lightsaml/sp-bundle": "~1.0.3",
         "symfony/expression-language": "~2.8",
-        "egeloen/ordered-form-bundle": "^3.0",
+       "egeloen/ordered-form-bundle": "^3.0",
         "php-amqplib/rabbitmq-bundle": "^1.10"
     },
     "require-dev": {
