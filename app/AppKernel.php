@@ -154,6 +154,7 @@ class AppKernel extends Kernel
             new Symfony\Bundle\TwigBundle\TwigBundle(),
             new Debril\RssAtomBundle\DebrilRssAtomBundle(),
             new OldSound\RabbitMqBundle\OldSoundRabbitMqBundle(),
+            new Leezy\PheanstalkBundle\LeezyPheanstalkBundle(),
             // Mautic Bundles
             new Mautic\ApiBundle\MauticApiBundle(),
             new Mautic\AssetBundle\MauticAssetBundle(),
