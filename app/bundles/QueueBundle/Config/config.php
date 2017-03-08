@@ -32,7 +32,7 @@ return [
             'mautic.queue.beanstalkd.subscriber' => [
                 'class'     => 'Mautic\QueueBundle\EventListener\BeanstalkdSubscriber',
                 'arguments' => [
-                    'leezy.pheanstalk',
+                    'service_container',
                     'mautic.queue.service',
                 ],
             ],
