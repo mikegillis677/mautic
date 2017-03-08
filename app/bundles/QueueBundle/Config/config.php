@@ -29,6 +29,13 @@ return [
                     'mautic.helper.core_parameters',
                 ],
             ],
+            'mautic.queue.beanstalkd.subscriber' => [
+                'class'     => 'Mautic\QueueBundle\EventListener\BeanstalkdSubscriber',
+                'arguments' => [
+                    'leezy.pheanstalk',
+                    'mautic.queue.service',
+                ],
+            ],
         ],
         'forms' => [
             'mautic.form.type.queueconfig' => [
