@@ -155,8 +155,6 @@ class AppKernel extends Kernel
             new Oneup\UploaderBundle\OneupUploaderBundle(),
             new Symfony\Bundle\TwigBundle\TwigBundle(),
             new Debril\RssAtomBundle\DebrilRssAtomBundle(),
-            new OldSound\RabbitMqBundle\OldSoundRabbitMqBundle(),
-            new Leezy\PheanstalkBundle\LeezyPheanstalkBundle(),
             // Mautic Bundles
             new Mautic\ApiBundle\MauticApiBundle(),
             new Mautic\AssetBundle\MauticAssetBundle(),
@@ -184,6 +182,9 @@ class AppKernel extends Kernel
             new Mautic\WebhookBundle\MauticWebhookBundle(),
             new LightSaml\SymfonyBridgeBundle\LightSamlSymfonyBridgeBundle(),
             new LightSaml\SpBundle\LightSamlSpBundle(),
+            // These two bundles do DI based on config, so they need to be loaded after config is declared in MauticQueueBundle
+            new OldSound\RabbitMqBundle\OldSoundRabbitMqBundle(),
+            new Leezy\PheanstalkBundle\LeezyPheanstalkBundle(),
         ];
 
         //dynamically register Mautic Plugin Bundles
