@@ -12,10 +12,7 @@
 namespace Mautic\QueueBundle\EventListener;
 
 use Mautic\QueueBundle\Event as Events;
-use Mautic\QueueBundle\Model\RabbitMqConsumer;
-use Mautic\QueueBundle\Model\RabbitMqProducer;
 use Mautic\QueueBundle\Queue\QueueProtocol;
-use OldSound\RabbitMqBundle\RabbitMq\Consumer;
 use Symfony\Component\DependencyInjection\ContainerInterface;
 use Symfony\Component\Validator\Constraints\NotBlank;
 
