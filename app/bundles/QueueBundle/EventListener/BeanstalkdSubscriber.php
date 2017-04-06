@@ -15,6 +15,7 @@ use Mautic\QueueBundle\Event as Events;
 use Mautic\QueueBundle\Queue\QueueConsumerResults;
 use Mautic\QueueBundle\Queue\QueueProtocol;
 use Mautic\QueueBundle\Queue\QueueService;
+use Pheanstalk\Exception\ServerException;
 use Pheanstalk\PheanstalkInterface;
 use Symfony\Component\DependencyInjection\ContainerInterface;
 use Symfony\Component\Validator\Constraints\NotBlank;
@@ -94,6 +95,25 @@ class BeanstalkdSubscriber extends AbstractQueueSubscriber
             }
 
             ++$messagesConsumed;
+        }
+    }
+
+    /**
+     * @param Events\QueueEvent $event
+     *
+     * @throws ServerException
+     */
+    public function countMessages(Events\QueueEvent $event)
+    {
+        try {
+            $pheanstalk = $this->container->get('leezy.pheanstalk');
+            $stats      = $pheanstalk->statsTube($event->getQueueName());
+            $event->setResult((int) $stats['current-jobs-ready']);
+        } catch (ServerException $e) {
+            if ($e->getMessage() !== 'Server reported NOT_FOUND') {
+                throw $e;
+            }
+            $event->setResult(0);
         }
     }
 
