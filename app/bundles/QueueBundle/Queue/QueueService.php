@@ -69,6 +69,20 @@ class QueueService
     }
 
     /**
+     * @param string $queueName
+     *
+     * @return int
+     */
+    public function countMessages($queueName)
+    {
+        $protocol = $this->coreParametersHelper->getParameter('queue_protocol');
+        $event    = new QueueEvent($protocol, $queueName);
+        $this->eventDispatcher->dispatch(QueueEvents::COUNT_MESSAGES, $event);
+
+        return (int) $event->getResult();
+    }
+
+    /**
      * @param string $payload
      *
      * @return QueueConsumerEvent
