@@ -39,6 +39,11 @@ class QueueEvent extends CommonEvent
     private $queueName;
 
     /**
+     * @var mixed
+     */
+    private $result;
+
+    /**
      * QueueEvent constructor.
      *
      * @param string   $protocol
@@ -52,6 +57,7 @@ class QueueEvent extends CommonEvent
         $this->payload   = $payload;
         $this->protocol  = $protocol;
         $this->queueName = $queueName;
+        $this->result    = null;
     }
 
     /**
@@ -84,6 +90,22 @@ class QueueEvent extends CommonEvent
     public function getQueueName()
     {
         return $this->queueName;
+    }
+
+    /**
+     * @return mixed
+     */
+    public function getResult()
+    {
+        return $this->result;
+    }
+
+    /**
+     * @param mixed $result
+     */
+    public function setResult($result)
+    {
+        $this->result = $result;
     }
 
     /**

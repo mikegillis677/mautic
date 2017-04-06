@@ -76,6 +76,22 @@ class RabbitMqSubscriber extends AbstractQueueSubscriber
     }
 
     /**
+     * @param Events\QueueEvent $event
+     */
+    public function countMessages(Events\QueueEvent $event)
+    {
+        $producer             = $this->container->get('old_sound_rabbit_mq.mautic_producer');
+        list(, $messageCount) = $producer->getChannel()->queue_declare(
+            $event->getQueueName(),
+            false,
+            true,
+            false,
+            false
+        );
+        $event->setResult($messageCount);
+    }
+
+    /**
      * @param Events\QueueConfigEvent $event
      */
     public function buildConfig(Events\QueueConfigEvent $event)
