@@ -13,9 +13,13 @@ namespace Mautic\CampaignBundle\EventListener;
 
 use Mautic\CampaignBundle\CampaignEvents;
 use Mautic\CampaignBundle\Event as Events;
+use Mautic\CampaignBundle\Model\EventModel;
 use Mautic\CoreBundle\EventListener\CommonSubscriber;
 use Mautic\CoreBundle\Helper\IpLookupHelper;
 use Mautic\CoreBundle\Model\AuditLogModel;
+use Mautic\QueueBundle\Event\QueueConsumerEvent;
+use Mautic\QueueBundle\Queue\QueueConsumerResults;
+use Mautic\QueueBundle\QueueEvents;
 
 /**
  * Class CampaignSubscriber.
@@ -33,15 +37,25 @@ class CampaignSubscriber extends CommonSubscriber
     protected $auditLogModel;
 
     /**
+     * @var EventModel
+     */
+    protected $campaignEventModel;
+
+    /**
      * CampaignSubscriber constructor.
      *
      * @param IpLookupHelper $ipLookupHelper
      * @param AuditLogModel  $auditLogModel
+     * @param EventModel     $campaignEventModel
      */
-    public function __construct(IpLookupHelper $ipLookupHelper, AuditLogModel $auditLogModel)
-    {
-        $this->ipLookupHelper = $ipLookupHelper;
-        $this->auditLogModel  = $auditLogModel;
+    public function __construct(
+        IpLookupHelper $ipLookupHelper,
+        AuditLogModel $auditLogModel,
+        EventModel $campaignEventModel
+    ) {
+        $this->ipLookupHelper     = $ipLookupHelper;
+        $this->auditLogModel      = $auditLogModel;
+        $this->campaignEventModel = $campaignEventModel;
     }
 
     /**
@@ -53,6 +67,7 @@ class CampaignSubscriber extends CommonSubscriber
             CampaignEvents::CAMPAIGN_POST_SAVE   => ['onCampaignPostSave', 0],
             CampaignEvents::CAMPAIGN_POST_DELETE => ['onCampaignDelete', 0],
             CampaignEvents::CAMPAIGN_ON_BUILD    => ['onCampaignBuild', 0],
+            QueueEvents::NEGATIVE_EVENTS_TRIGGER => ['onNegativeEventsTrigger', 0],
         ];
     }
 
@@ -119,5 +134,32 @@ class CampaignSubscriber extends CommonSubscriber
             'callback' => '\Mautic\CampaignBundle\Helper\CampaignEventHelper::addRemoveLead',
         ];
         $event->addAction('campaign.addremovelead', $addRemoveLeadAction);
+    }
+
+    /**
+     * Trigger negative events.
+     *
+     * @param QueueConsumerEvent $event
+     */
+    public function onNegativeEventsTrigger(QueueConsumerEvent $event)
+    {
+        $payload         = $event->getPayload();
+        $campaignId      = $payload['campaignId'];
+        $start           = $payload['start'];
+        $limit           = $payload['limit'];
+        $max             = $payload['max'];
+        $leadCount       = $payload['leadCount'];
+        $totalEventCount = $payload['totalEventCount'];
+        $returnCounts    = $payload['returnCounts'];
+        $this->campaignEventModel->triggerNegativeEvent(
+            $campaignId,
+            $start,
+            $limit,
+            $max,
+            $leadCount,
+            $totalEventCount,
+            $returnCounts
+        );
+        $event->setResult(QueueConsumerResults::ACKNOWLEDGE);
     }
 }
