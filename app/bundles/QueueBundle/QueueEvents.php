@@ -27,5 +27,7 @@ final class QueueEvents
 
     const EMAIL_HIT = 'mautic.queue_email_hit';
 
+    const NEGATIVE_EVENTS_TRIGGER = 'mautic.queue_negative_events_trigger';
+
     const PAGE_HIT = 'mautic.queue_page_hit';
 }

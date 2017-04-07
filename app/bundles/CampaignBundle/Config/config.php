@@ -223,6 +223,7 @@ return [
                     'mautic.campaign.model.campaign',
                     'mautic.user.model.user',
                     'mautic.core.model.notification',
+                    'mautic.queue.service',
                     'mautic.factory',
                 ],
             ],
