@@ -12,10 +12,11 @@
 namespace Mautic\QueueBundle\Queue;
 
 /**
- * Class QueueName
+ * Class QueueName.
  */
 final class QueueName
 {
-    const EMAIL_HIT = 'email_hit';
-    const PAGE_HIT = 'page_hit';
+    const EMAIL_HIT               = 'email_hit';
+    const NEGATIVE_EVENTS_TRIGGER = 'negative_events_trigger';
+    const PAGE_HIT                = 'page_hit';
 }
