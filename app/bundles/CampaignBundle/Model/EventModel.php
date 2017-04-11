@@ -16,6 +16,7 @@ use Doctrine\ORM\EntityNotFoundException;
 use Mautic\CampaignBundle\CampaignEvents;
 use Mautic\CampaignBundle\Entity\Campaign;
 use Mautic\CampaignBundle\Entity\Event;
+use Mautic\CampaignBundle\Entity\EventRepository;
 use Mautic\CampaignBundle\Entity\LeadEventLog;
 use Mautic\CampaignBundle\Entity\LeadEventLogRepository;
 use Mautic\CampaignBundle\Event\CampaignDecisionEvent;
@@ -144,7 +145,7 @@ class EventModel extends CommonFormModel
     /**
      * {@inheritdoc}
      *
-     * @return \Mautic\CampaignBundle\Entity\EventRepository
+     * @return EventRepository
      */
     public function getRepository()
     {
@@ -276,7 +277,7 @@ class EventModel extends CommonFormModel
         }
 
         //get the list of events that match the triggering event and is in the campaigns this lead belongs to
-        /** @var \Mautic\CampaignBundle\Entity\EventRepository $eventRepo */
+        /** @var EventRepository $eventRepo */
         $eventRepo = $this->getRepository();
         if (empty($eventList[$leadId][$type])) {
             $eventList[$leadId][$type] = $eventRepo->getPublishedByType($type, $leadCampaigns[$leadId], $lead->getId());
@@ -482,22 +483,8 @@ class EventModel extends CommonFormModel
 
         $repo         = $this->getRepository();
         $campaignRepo = $this->getCampaignRepository();
-        $logRepo      = $this->getLeadEventLogRepository();
 
-        if ($this->dispatcher->hasListeners(CampaignEvents::ON_EVENT_DECISION_TRIGGER)) {
-            // Include decisions if there are listeners
-            $events = $repo->getRootLevelEvents($campaignId, true, true);
-
-            // Filter out decisions
-            $decisionChildren = [];
-            foreach ($events as $event) {
-                if ($event['eventType'] == 'decision') {
-                    $decisionChildren[$event['id']] = $repo->getEventsByParent($event['id']);
-                }
-            }
-        } else {
-            $events = $repo->getRootLevelEvents($campaignId);
-        }
+        list($events, $decisionChildren) = $this->getStartingEventsAndDecisionChildren($campaignId, $repo);
 
         $rootEventCount = count($events);
 
@@ -512,9 +499,6 @@ class EventModel extends CommonFormModel
                 'totalExecuted'  => 0,
             ] : 0;
         }
-
-        // Event settings
-        $eventSettings = $this->campaignModel->getEvents();
 
         // Get a lead count; if $leadId, then use this as a check to ensure lead is part of the campaign
         $leadCount = $campaignRepo->getCampaignLeadCount($campaignId, $leadId, array_keys($events));
@@ -559,8 +543,8 @@ class EventModel extends CommonFormModel
 
         $continue = true;
 
-        $sleepBatchCount   = 0;
         $batchDebugCounter = 1;
+        $minLeadId         = 0;
 
         $this->logger->debug('CAMPAIGN: Processing the following events: '.implode(', ', array_keys($events)));
 
@@ -568,7 +552,13 @@ class EventModel extends CommonFormModel
             $this->logger->debug('CAMPAIGN: Batch #'.$batchDebugCounter);
 
             // Get list of all campaign leads; start is always zero in practice because of $pendingOnly
-            $campaignLeads = ($leadId) ? [$leadId] : $campaignRepo->getCampaignLeadIds($campaignId, 0, $limit, true);
+            $campaignLeads = ($leadId) ? [$leadId] : $campaignRepo->getCampaignLeadIds(
+                $campaignId,
+                0,
+                $limit,
+                true,
+                $minLeadId
+            );
 
             if (empty($campaignLeads)) {
                 // No leads found
@@ -577,165 +567,52 @@ class EventModel extends CommonFormModel
                 break;
             }
 
-            $leads = $this->leadModel->getEntities(
-                [
-                    'filter' => [
-                        'force' => [
-                            [
-                                'column' => 'l.id',
-                                'expr'   => 'in',
-                                'value'  => $campaignLeads,
-                            ],
-                        ],
-                    ],
-                    'orderBy'            => 'l.id',
-                    'orderByDir'         => 'asc',
-                    'withPrimaryCompany' => true,
-                    'withChannelRules'   => true,
-                ]
-            );
+            $minLeadId = array_reduce($campaignLeads, 'max', reset($campaignLeads));
 
-            $this->logger->debug('CAMPAIGN: Processing the following contacts: '.implode(', ', array_keys($leads)));
+            if ($this->queueService->isQueueEnabled()) {
+                $msg = [
+                    'campaignId'       => $campaignId,
+                    'campaignLeads'    => $campaignLeads,
+                    'limit'            => $limit,
+                    'max'              => $max,
+                    'maxCount'         => $maxCount,
+                    'events'           => null,
+                    'decisionChildren' => null,
+                    'totalEventCount'  => $totalEventCount,
+                    'returnCounts'     => $returnCounts,
+                ];
+                $this->queueService->publishToQueue(QueueName::STARTING_EVENTS_TRIGGER, $msg);
 
-            if (!count($leads)) {
-                // Just a precaution in case non-existent leads are lingering in the campaign leads table
-                $this->logger->debug('CAMPAIGN: No contact entities found.');
+                $totalEventCount += $limit;
+                $rootEvaluatedCount += $limit;
+            } else {
+                $counts = $this->triggerStartingEvent(
+                    $campaignId,
+                    $campaignLeads,
+                    $limit,
+                    $max,
+                    $maxCount,
+                    $events,
+                    $decisionChildren,
+                    $totalEventCount,
+                    $returnCounts
+                );
 
-                break;
+                if ($returnCounts) {
+                    $rootEvaluatedCount += $counts['evaluated'];
+                    $rootExecutedCount += $counts['executed'];
+                    $evaluatedEventCount += $counts['totalEvaluated'];
+                    $executedEventCount += $counts['totalExecuted'];
+                } else {
+                    $executedEventCount = $counts;
+                }
             }
 
-            /** @var \Mautic\LeadBundle\Entity\Lead $lead */
-            $leadDebugCounter = 1;
-            foreach ($leads as $lead) {
-                $this->logger->debug('CAMPAIGN: Current Lead ID# '.$lead->getId().'; #'.$leadDebugCounter.' in batch #'.$batchDebugCounter);
-
-                if ($rootEvaluatedCount >= $maxCount || ($max && ($rootEvaluatedCount + $rootEventCount) >= $max)) {
-                    // Hit the max or will hit the max mid-progress for a lead
-                    $continue = false;
-                    $this->logger->debug('CAMPAIGN: Hit max so aborting.');
-
-                    break;
-                }
-
-                // Set lead in case this is triggered by the system
-                $this->leadModel->setSystemCurrentLead($lead);
-
-                foreach ($events as $event) {
-                    ++$rootEvaluatedCount;
-
-                    if ($sleepBatchCount == $limit) {
-                        // Keep CPU down
-                        $this->batchSleep();
-                        $sleepBatchCount = 0;
-                    } else {
-                        ++$sleepBatchCount;
-                    }
-
-                    if ($event['eventType'] == 'decision') {
-                        ++$evaluatedEventCount;
-                        ++$totalEventCount;
-
-                        $event['campaign'] = [
-                            'id'   => $campaign->getId(),
-                            'name' => $campaign->getName(),
-                        ];
-
-                        $decisionEvent = [
-                            $campaignId => [
-                                array_merge(
-                                    $event,
-                                    ['children' => $decisionChildren[$event['id']]]
-                                ),
-                            ],
-                        ];
-                        $decisionTriggerEvent = new CampaignDecisionEvent($lead, $event['type'], null, $decisionEvent, $eventSettings, true);
-                        $this->dispatcher->dispatch(
-                            CampaignEvents::ON_EVENT_DECISION_TRIGGER,
-                            $decisionTriggerEvent
-                        );
-                        if ($decisionTriggerEvent->wasDecisionTriggered()) {
-                            ++$executedEventCount;
-                            ++$rootExecutedCount;
-
-                            $this->logger->debug(
-                                'CAMPAIGN: Decision ID# '.$event['id'].' for contact ID# '.$lead->getId()
-                                .' noted as completed by event listener thus executing children.'
-                            );
-
-                            // Decision has already been triggered by the lead so process the associated events
-                            $decisionLogged = false;
-                            foreach ($decisionEvent['children'] as $childEvent) {
-                                if ($this->executeEvent(
-                                        $childEvent,
-                                        $campaign,
-                                        $lead,
-                                        $eventSettings,
-                                        false,
-                                        null,
-                                        null,
-                                        false,
-                                        $evaluatedEventCount,
-                                        $executedEventCount,
-                                        $totalEventCount
-                                    )
-                                    && !$decisionLogged
-                                ) {
-                                    // Log the decision
-                                    $log = $this->getLogEntity($decisionEvent['id'], $campaign, $lead, null, true);
-                                    $log->setDateTriggered(new \DateTime());
-                                    $log->setNonActionPathTaken(true);
-                                    $logRepo->saveEntity($log);
-                                    $this->em->detach($log);
-                                    unset($log);
-
-                                    $decisionLogged = true;
-                                }
-                            }
-                        }
-
-                        unset($decisionEvent);
-                    } else {
-                        if ($this->executeEvent(
-                            $event,
-                            $campaign,
-                            $lead,
-                            $eventSettings,
-                            false,
-                            null,
-                            null,
-                            false,
-                            $evaluatedEventCount,
-                            $executedEventCount,
-                            $totalEventCount
-                        )
-                        ) {
-                            ++$rootExecutedCount;
-                        }
-                    }
-
-                    unset($event);
-
-                    if ($output && $rootEvaluatedCount < $maxCount) {
-                        $progress->setProgress($rootEvaluatedCount);
-                    }
-                }
-
-                // Free some RAM
-                $this->em->detach($lead);
-                unset($lead);
-
-                ++$leadDebugCounter;
+            if ($rootEvaluatedCount >= $maxCount || ($max && ($rootEvaluatedCount + $rootEventCount) >= $max)) {
+                // Hit the max or will hit the max mid-progress for a lead
+                $continue = false;
+                $this->logger->debug('CAMPAIGN: Hit max so aborting.');
             }
-
-            $this->em->clear('Mautic\LeadBundle\Entity\Lead');
-            $this->em->clear('Mautic\UserBundle\Entity\User');
-
-            unset($leads, $campaignLeads);
-
-            // Free some memory
-            gc_collect_cycles();
-
-            $this->triggerConditions($campaign, $evaluatedEventCount, $executedEventCount, $totalEventCount);
 
             ++$batchDebugCounter;
         }
@@ -755,6 +632,241 @@ class EventModel extends CommonFormModel
         $this->logger->debug('CAMPAIGN: Counts - '.var_export($counts, true));
 
         return ($returnCounts) ? $counts : $executedEventCount;
+    }
+
+    /**
+     * @param int   $campaignId
+     * @param int[] $campaignLeads
+     * @param int   $limit
+     * @param int   $max
+     * @param int   $maxCount
+     * @param array $events
+     * @param array $decisionChildren
+     * @param int   $totalEventCount
+     * @param bool  $returnCounts
+     *
+     * @return array|int
+     */
+    public function triggerStartingEvent(
+        $campaignId,
+        $campaignLeads,
+        $limit,
+        $max,
+        $maxCount,
+        $events,
+        $decisionChildren,
+        &$totalEventCount,
+        $returnCounts
+    ) {
+        $repo         = $this->getRepository();
+        $logRepo      = $this->getLeadEventLogRepository();
+        $campaignRepo = $this->getCampaignRepository();
+
+        $sleepBatchCount     = 0;
+        $evaluatedEventCount = $executedEventCount = $rootEvaluatedCount = $rootExecutedCount = 0;
+        $rootEventCount      = count($events);
+
+        if ($events === null || $decisionChildren === null) {
+            list($events, $decisionChildren) = $this->getStartingEventsAndDecisionChildren($campaignId, $repo);
+        }
+
+        // Event settings
+        $eventSettings = $this->campaignModel->getEvents();
+        $campaign      = $campaignRepo->find($campaignId);
+
+        $leads = $this->leadModel->getEntities(
+            [
+                'filter' => [
+                    'force' => [
+                        [
+                            'column' => 'l.id',
+                            'expr'   => 'in',
+                            'value'  => $campaignLeads,
+                        ],
+                    ],
+                ],
+                'orderBy'            => 'l.id',
+                'orderByDir'         => 'asc',
+                'withPrimaryCompany' => true,
+                'withChannelRules'   => true,
+            ]
+        );
+
+        $this->logger->debug('CAMPAIGN: Processing the following contacts: '.implode(', ', array_keys($leads)));
+
+        if (!count($leads)) {
+            // Just a precaution in case non-existent leads are lingering in the campaign leads table
+            $this->logger->debug('CAMPAIGN: No contact entities found.');
+
+            $counts = [
+                'evaluated'      => $rootEvaluatedCount,
+                'executed'       => $rootExecutedCount,
+                'totalEvaluated' => $evaluatedEventCount,
+                'totalExecuted'  => $executedEventCount,
+            ];
+
+            return ($returnCounts) ? $counts : $executedEventCount;
+        }
+
+        /** @var \Mautic\LeadBundle\Entity\Lead $lead */
+        $leadDebugCounter = 1;
+        foreach ($leads as $lead) {
+            $this->logger->debug('CAMPAIGN: Current Lead ID# '.$lead->getId().'; #'.$leadDebugCounter);
+
+            if ($rootEvaluatedCount >= $maxCount || ($max && ($rootEvaluatedCount + $rootEventCount) >= $max)) {
+                break;
+            }
+
+            // Set lead in case this is triggered by the system
+            $this->leadModel->setSystemCurrentLead($lead);
+
+            foreach ($events as $event) {
+                ++$rootEvaluatedCount;
+
+                if ($sleepBatchCount == $limit) {
+                    // Keep CPU down
+                    $this->batchSleep();
+                    $sleepBatchCount = 0;
+                } else {
+                    ++$sleepBatchCount;
+                }
+
+                if ($event['eventType'] == 'decision') {
+                    ++$evaluatedEventCount;
+                    ++$totalEventCount;
+
+                    $event['campaign'] = [
+                        'id'   => $campaign->getId(),
+                        'name' => $campaign->getName(),
+                    ];
+
+                    $decisionEvent = [
+                        $campaignId => [
+                            array_merge(
+                                $event,
+                                ['children' => $decisionChildren[$event['id']]]
+                            ),
+                        ],
+                    ];
+                    $decisionTriggerEvent = new CampaignDecisionEvent($lead, $event['type'], null, $decisionEvent, $eventSettings, true);
+                    $this->dispatcher->dispatch(
+                        CampaignEvents::ON_EVENT_DECISION_TRIGGER,
+                        $decisionTriggerEvent
+                    );
+                    if ($decisionTriggerEvent->wasDecisionTriggered()) {
+                        ++$executedEventCount;
+                        ++$rootExecutedCount;
+
+                        $this->logger->debug(
+                            'CAMPAIGN: Decision ID# '.$event['id'].' for contact ID# '.$lead->getId()
+                            .' noted as completed by event listener thus executing children.'
+                        );
+
+                        // Decision has already been triggered by the lead so process the associated events
+                        $decisionLogged = false;
+                        foreach ($decisionEvent['children'] as $childEvent) {
+                            if ($this->executeEvent(
+                                    $childEvent,
+                                    $campaign,
+                                    $lead,
+                                    $eventSettings,
+                                    false,
+                                    null,
+                                    null,
+                                    false,
+                                    $evaluatedEventCount,
+                                    $executedEventCount,
+                                    $totalEventCount
+                                )
+                                && !$decisionLogged
+                            ) {
+                                // Log the decision
+                                $log = $this->getLogEntity($decisionEvent['id'], $campaign, $lead, null, true);
+                                $log->setDateTriggered(new \DateTime());
+                                $log->setNonActionPathTaken(true);
+                                $logRepo->saveEntity($log);
+                                $this->em->detach($log);
+                                unset($log);
+
+                                $decisionLogged = true;
+                            }
+                        }
+                    }
+
+                    unset($decisionEvent);
+                } else {
+                    if ($this->executeEvent(
+                        $event,
+                        $campaign,
+                        $lead,
+                        $eventSettings,
+                        false,
+                        null,
+                        null,
+                        false,
+                        $evaluatedEventCount,
+                        $executedEventCount,
+                        $totalEventCount
+                    )
+                    ) {
+                        ++$rootExecutedCount;
+                    }
+                }
+
+                unset($event);
+            }
+
+            // Free some RAM
+            $this->em->detach($lead);
+            unset($lead);
+
+            ++$leadDebugCounter;
+        }
+
+        $this->em->clear('Mautic\LeadBundle\Entity\Lead');
+        $this->em->clear('Mautic\UserBundle\Entity\User');
+
+        unset($leads, $campaignLeads);
+
+        // Free some memory
+        gc_collect_cycles();
+
+        $this->triggerConditions($campaign, $evaluatedEventCount, $executedEventCount, $totalEventCount);
+
+        $counts = [
+            'evaluated'      => $rootEvaluatedCount,
+            'executed'       => $rootExecutedCount,
+            'totalEvaluated' => $evaluatedEventCount,
+            'totalExecuted'  => $executedEventCount,
+        ];
+
+        return ($returnCounts) ? $counts : $executedEventCount;
+    }
+
+    /**
+     * @param int             $campaignId
+     * @param EventRepository $repo
+     *
+     * @return array
+     */
+    protected function getStartingEventsAndDecisionChildren($campaignId, EventRepository $repo)
+    {
+        $decisionChildren = [];
+        if ($this->dispatcher->hasListeners(CampaignEvents::ON_EVENT_DECISION_TRIGGER)) {
+            // Include decisions if there are listeners
+            $events = $repo->getRootLevelEvents($campaignId, true);
+
+            // Filter out decisions
+            foreach ($events as $event) {
+                if ($event['eventType'] == 'decision') {
+                    $decisionChildren[$event['id']] = $repo->getEventsByParent($event['id']);
+                }
+            }
+        } else {
+            $events = $repo->getRootLevelEvents($campaignId);
+        }
+
+        return [$events, $decisionChildren];
     }
 
     /**
@@ -1173,7 +1285,7 @@ class EventModel extends CommonFormModel
         $limit,
         $max,
         $leadCount,
-        $totalEventCount,
+        &$totalEventCount,
         $returnCounts = false
     ) {
         // Try to save some memory
