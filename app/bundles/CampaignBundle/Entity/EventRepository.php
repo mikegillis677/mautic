@@ -261,14 +261,21 @@ class EventRepository extends CommonRepository
     /**
      * Get a list of scheduled events.
      *
-     * @param      $campaignId
-     * @param bool $count
-     * @param int  $limit
+     * @param $campaignId
+     * @param bool        $count
+     * @param int         $limit
+     * @param string|null $lastTriggerDate
+     * @param int|null    $lastLeadId
      *
      * @return array|bool
      */
-    public function getScheduledEvents($campaignId, $count = false, $limit = 0)
-    {
+    public function getScheduledEvents(
+        $campaignId,
+        $count = false,
+        $limit = 0,
+        $lastTriggerDate = null,
+        $lastLeadId = null
+    ) {
         $date = new \Datetime();
 
         $q = $this->getEntityManager()->createQueryBuilder()
@@ -284,6 +291,15 @@ class EventRepository extends CommonRepository
             ->setParameter('now', $date)
             ->setParameter('true', true, 'boolean');
 
+        if ($lastTriggerDate) {
+            $q->andWhere()->expr()->lte('o.triggerDate', ':lastTriggerDate');
+            $q->setParameter('lastTriggerDate', $lastTriggerDate);
+        }
+        if ($lastLeadId) {
+            $q->andWhere()->expr()->gt('o.leadId', ':lastLeadId');
+            $q->setParameter('lastLeadId', $lastLeadId);
+        }
+
         if ($count) {
             $q->select('COUNT(o) as event_count');
 
@@ -293,8 +309,9 @@ class EventRepository extends CommonRepository
             return $count;
         }
 
-        $q->select('o, IDENTITY(o.lead) as lead_id, IDENTITY(o.event) AS event_id')
-            ->orderBy('o.triggerDate', 'DESC');
+        $q->select('o, IDENTITY(o.lead) as lead_id, IDENTITY(o.event) AS event_id, o.triggerDate AS trigger_date')
+            ->orderBy('o.triggerDate', 'DESC')
+            ->addOrderBy('o.lead_id', 'ASC');
 
         if ($limit) {
             $q->setFirstResult(0)

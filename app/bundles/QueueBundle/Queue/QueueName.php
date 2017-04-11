@@ -16,8 +16,9 @@ namespace Mautic\QueueBundle\Queue;
  */
 final class QueueName
 {
-    const EMAIL_HIT               = 'email_hit';
-    const NEGATIVE_EVENTS_TRIGGER = 'negative_events_trigger';
-    const PAGE_HIT                = 'page_hit';
-    const STARTING_EVENTS_TRIGGER = 'starting_events_trigger';
+    const EMAIL_HIT                = 'email_hit';
+    const NEGATIVE_EVENTS_TRIGGER  = 'negative_events_trigger';
+    const PAGE_HIT                 = 'page_hit';
+    const SCHEDULED_EVENTS_TRIGGER = 'scheduled_events_trigger';
+    const STARTING_EVENTS_TRIGGER  = 'starting_events_trigger';
 }
