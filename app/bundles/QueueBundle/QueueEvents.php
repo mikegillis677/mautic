@@ -31,5 +31,7 @@ final class QueueEvents
 
     const PAGE_HIT = 'mautic.queue_page_hit';
 
+    const SCHEDULED_EVENTS_TRIGGER = 'mautic.queue_scheduled_events_trigger';
+
     const STARTING_EVENTS_TRIGGER = 'mautic.queue_starting_events_trigger';
 }
