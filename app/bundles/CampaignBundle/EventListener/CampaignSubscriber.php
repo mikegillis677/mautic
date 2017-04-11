@@ -64,11 +64,12 @@ class CampaignSubscriber extends CommonSubscriber
     public static function getSubscribedEvents()
     {
         return [
-            CampaignEvents::CAMPAIGN_POST_SAVE   => ['onCampaignPostSave', 0],
-            CampaignEvents::CAMPAIGN_POST_DELETE => ['onCampaignDelete', 0],
-            CampaignEvents::CAMPAIGN_ON_BUILD    => ['onCampaignBuild', 0],
-            QueueEvents::NEGATIVE_EVENTS_TRIGGER => ['onNegativeEventsTrigger', 0],
-            QueueEvents::STARTING_EVENTS_TRIGGER => ['onStartingEventsTrigger', 0],
+            CampaignEvents::CAMPAIGN_POST_SAVE    => ['onCampaignPostSave', 0],
+            CampaignEvents::CAMPAIGN_POST_DELETE  => ['onCampaignDelete', 0],
+            CampaignEvents::CAMPAIGN_ON_BUILD     => ['onCampaignBuild', 0],
+            QueueEvents::NEGATIVE_EVENTS_TRIGGER  => ['onNegativeEventsTrigger', 0],
+            QueueEvents::SCHEDULED_EVENTS_TRIGGER => ['onScheduledEventsTrigger', 0],
+            QueueEvents::STARTING_EVENTS_TRIGGER  => ['onStartingEventsTrigger', 0],
         ];
     }
 
@@ -159,6 +160,30 @@ class CampaignSubscriber extends CommonSubscriber
             $max,
             $leadCount,
             $totalEventCount,
+            $returnCounts
+        );
+        $event->setResult(QueueConsumerResults::ACKNOWLEDGE);
+    }
+
+    public function onScheduledEventsTrigger(QueueConsumerEvent $event)
+    {
+        $payload             = $event->getPayload();
+        $campaignId          = $payload['campaignId'];
+        $events              = $payload['events'];
+        $campaignEvents      = $payload['campaignEvents'];
+        $eventSettings       = $payload['eventSettings'];
+        $limit               = $payload['limit'];
+        $max                 = $payload['max'];
+        $totalScheduledCount = $payload['totalScheduledCount'];
+        $returnCounts        = $payload['returnCounts'];
+        $this->campaignEventModel->triggerScheduledEvent(
+            $campaignId,
+            $events,
+            $campaignEvents,
+            $eventSettings,
+            $limit,
+            $max,
+            $totalScheduledCount,
             $returnCounts
         );
         $event->setResult(QueueConsumerResults::ACKNOWLEDGE);
