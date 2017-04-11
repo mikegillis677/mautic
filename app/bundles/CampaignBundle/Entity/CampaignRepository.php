@@ -579,14 +579,18 @@ class CampaignRepository extends CommonRepository
     /**
      * Get lead IDs of a campaign.
      *
-     * @param            $campaignId
+     * @param $campaignId
      * @param int        $start
      * @param bool|false $limit
-     * @param bool|false  getCampaignLeadIds
+     * @param bool       $pendingOnly
+     * @param int|null   $minLeadId
      *
      * @return array
+     *
+     * @internal param int|null $minLeadId
+     * @internal param bool|false $getCampaignLeadIds
      */
-    public function getCampaignLeadIds($campaignId, $start = 0, $limit = false, $pendingOnly = false)
+    public function getCampaignLeadIds($campaignId, $start = 0, $limit = false, $pendingOnly = false, $minLeadId = null)
     {
         $q = $this->getEntityManager()->getConnection()->createQueryBuilder();
 
@@ -600,6 +604,14 @@ class CampaignRepository extends CommonRepository
             )
             ->setParameter('false', false, 'boolean')
             ->orderBy('cl.lead_id', 'ASC');
+
+        if ($minLeadId !== null) {
+            $q
+                ->andWhere(
+                    $q->expr()->gt('cl.lead_id', ':minLeadId')
+                )
+                ->setParameter('minLeadId', $minLeadId, 'integer');
+        }
 
         if ($pendingOnly) {
             // Only leads that have not started the campaign

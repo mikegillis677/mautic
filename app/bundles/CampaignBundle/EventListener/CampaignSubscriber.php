@@ -68,6 +68,7 @@ class CampaignSubscriber extends CommonSubscriber
             CampaignEvents::CAMPAIGN_POST_DELETE => ['onCampaignDelete', 0],
             CampaignEvents::CAMPAIGN_ON_BUILD    => ['onCampaignBuild', 0],
             QueueEvents::NEGATIVE_EVENTS_TRIGGER => ['onNegativeEventsTrigger', 0],
+            QueueEvents::STARTING_EVENTS_TRIGGER => ['onStartingEventsTrigger', 0],
         ];
     }
 
@@ -157,6 +158,37 @@ class CampaignSubscriber extends CommonSubscriber
             $limit,
             $max,
             $leadCount,
+            $totalEventCount,
+            $returnCounts
+        );
+        $event->setResult(QueueConsumerResults::ACKNOWLEDGE);
+    }
+
+    /**
+     * Trigger starting events.
+     *
+     * @param QueueConsumerEvent $event
+     */
+    public function onStartingEventsTrigger(QueueConsumerEvent $event)
+    {
+        $payload          = $event->getPayload();
+        $campaignId       = $payload['campaignId'];
+        $campaignLeads    = $payload['campaignLeads'];
+        $limit            = $payload['limit'];
+        $max              = $payload['max'];
+        $maxCount         = $payload['maxCount'];
+        $events           = $payload['events'];
+        $decisionChildren = $payload['decisionChildren'];
+        $totalEventCount  = $payload['totalEventCount'];
+        $returnCounts     = $payload['returnCounts'];
+        $this->campaignEventModel->triggerStartingEvent(
+            $campaignId,
+            $campaignLeads,
+            $limit,
+            $max,
+            $maxCount,
+            $events,
+            $decisionChildren,
             $totalEventCount,
             $returnCounts
         );
