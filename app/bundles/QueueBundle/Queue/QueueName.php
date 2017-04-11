@@ -19,4 +19,5 @@ final class QueueName
     const EMAIL_HIT               = 'email_hit';
     const NEGATIVE_EVENTS_TRIGGER = 'negative_events_trigger';
     const PAGE_HIT                = 'page_hit';
+    const STARTING_EVENTS_TRIGGER = 'starting_events_trigger';
 }
