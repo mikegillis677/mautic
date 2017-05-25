@@ -585,7 +585,7 @@
                     this.clearErrors();
                     Form.switchPage(document.getElementById('mauticform_' + formId), 1);
 
-                    document.getElementById('mauticform_' + formId).reset();
+                    //document.getElementById('mauticform_' + formId).reset();
                 },
 
                 disableSubmitButton: function() {
