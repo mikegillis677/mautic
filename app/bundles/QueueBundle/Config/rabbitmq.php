@@ -36,7 +36,7 @@ $container->loadFromExtension(
                 ],
                 'queue_options' => [
                     'name'        => 'email_hit',
-                    'auto_delete' => true,
+                    'auto_delete' => false,
                     'durable'     => true,
                 ],
             ],
@@ -51,7 +51,7 @@ $container->loadFromExtension(
                 ],
                 'queue_options' => [
                     'name'        => 'email_hit',
-                    'auto_delete' => true,
+                    'auto_delete' => false,
                     'durable'     => true,
                 ],
                 'callback' => 'mautic.queue.helper.rabbitmq_consumer',
