@@ -72,7 +72,18 @@ class RabbitMqSubscriber extends AbstractQueueSubscriber
             'durable'     => true,
         ]);
         $consumer->setRoutingKey($event->getQueueName());
-        $consumer->consume($event->getMessages());
+        $done = false;
+        while (!$done) {
+            try {
+                $consumer->consume($event->getMessages());
+                $done = true;
+            } catch (\ErrorException $e) {
+                $this->logger->error('Error exception caught during consuming queue', [
+                    'message' => $e->getMessage(),
+                    'code'    => $e->getCode(),
+                ]);
+            }
+        }
     }
 
     /**
