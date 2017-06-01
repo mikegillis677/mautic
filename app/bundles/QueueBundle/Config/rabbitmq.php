@@ -51,11 +51,7 @@ $container->loadFromExtension(
                 ],
                 'queue_options' => [
                     'name'        => 'email_hit',
-<<<<<<< HEAD
                     'auto_delete' => false,
-=======
-                    'auto_delete' => true,
->>>>>>> Make messages durable so they don't get lost.
                     'durable'     => true,
                 ],
                 'callback' => 'mautic.queue.helper.rabbitmq_consumer',
