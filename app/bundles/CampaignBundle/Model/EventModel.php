@@ -17,6 +17,7 @@ use Mautic\CampaignBundle\CampaignEvents;
 use Mautic\CampaignBundle\Entity\Campaign;
 use Mautic\CampaignBundle\Entity\Event;
 use Mautic\CampaignBundle\Entity\EventRepository;
+use Mautic\CampaignBundle\Entity\FailedLeadEventLog;
 use Mautic\CampaignBundle\Entity\LeadEventLog;
 use Mautic\CampaignBundle\Entity\LeadEventLogRepository;
 use Mautic\CampaignBundle\Event\CampaignDecisionEvent;
@@ -1909,6 +1910,9 @@ class EventModel extends CommonFormModel
                     'event' => $event['id'],
                 ]
             );
+            if ($log) {
+                return false;
+            }
         }
 
         if (empty($log)) {
