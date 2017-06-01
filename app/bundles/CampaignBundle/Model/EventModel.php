@@ -1902,6 +1902,13 @@ class EventModel extends CommonFormModel
             } else {
                 $log = $this->em->getReference('MauticCampaignBundle:LeadEventLog', $logExists);
             }
+        } else {
+            $log = $logRepo->findOneBy(
+                [
+                    'lead'  => $lead->getId(),
+                    'event' => $event['id'],
+                ]
+            );
         }
 
         if (empty($log)) {
