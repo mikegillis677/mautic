@@ -29,6 +29,7 @@ class RabbitMqProducer extends Producer
 
         $this->queueOptions['name']        = $queue;
         $this->queueOptions['auto_delete'] = true;
+        $this->queueOptions['durable']     = true;
         $this->queueDeclared               = false;
         $this->setupFabric();
     }
