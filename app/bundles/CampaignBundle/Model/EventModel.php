@@ -612,6 +612,10 @@ class EventModel extends CommonFormModel
                 $this->logger->debug('CAMPAIGN: Hit max so aborting.');
             }
 
+            if ($output && $rootEvaluatedCount < $maxCount) {
+                $progress->setProgress($rootEvaluatedCount);
+            }
+
             ++$batchDebugCounter;
         }
 
@@ -1034,6 +1038,9 @@ class EventModel extends CommonFormModel
                 $this->logger->debug('CAMPAIGN: Counts - '.var_export($counts, true));
 
                 return ($returnCounts) ? $counts : $executedEventCount;
+            } elseif ($output) {
+                $currentCount = ($max) ? $totalEventCount : $evaluatedEventCount;
+                $progress->setProgress($currentCount);
             }
 
             ++$batchDebugCounter;
