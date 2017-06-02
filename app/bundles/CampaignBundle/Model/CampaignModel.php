@@ -28,6 +28,8 @@ use Mautic\LeadBundle\Entity\Lead;
 use Mautic\LeadBundle\Entity\LeadList;
 use Mautic\LeadBundle\Model\LeadModel;
 use Mautic\LeadBundle\Model\ListModel;
+use Mautic\QueueBundle\Queue\QueueName;
+use Mautic\QueueBundle\Queue\QueueService;
 use Symfony\Component\Console\Output\OutputInterface;
 use Symfony\Component\HttpKernel\Exception\MethodNotAllowedHttpException;
 
@@ -63,6 +65,11 @@ class CampaignModel extends CommonFormModel
     protected $formModel;
 
     /**
+     * @var QueueService
+     */
+    protected $queueService;
+
+    /**
      * @var
      */
     protected static $events;
@@ -74,14 +81,21 @@ class CampaignModel extends CommonFormModel
      * @param LeadModel            $leadModel
      * @param ListModel            $leadListModel
      * @param FormModel            $formModel
+     * @param QueueService         $queueService
      */
-    public function __construct(CoreParametersHelper $coreParametersHelper, LeadModel $leadModel, ListModel $leadListModel, FormModel $formModel)
-    {
+    public function __construct(
+        CoreParametersHelper $coreParametersHelper,
+        LeadModel $leadModel,
+        ListModel $leadListModel,
+        FormModel $formModel,
+        QueueService $queueService
+    ) {
         $this->leadModel              = $leadModel;
         $this->leadListModel          = $leadListModel;
         $this->formModel              = $formModel;
         $this->batchSleepTime         = $coreParametersHelper->getParameter('mautic.batch_sleep_time');
         $this->batchCampaignSleepTime = $coreParametersHelper->getParameter('mautic.batch_campaign_sleep_time');
+        $this->queueService           = $queueService;
     }
 
     /**
@@ -192,8 +206,12 @@ class CampaignModel extends CommonFormModel
      *
      * @throws \Symfony\Component\HttpKernel\Exception\MethodNotAllowedHttpException
      */
-    protected function dispatchEvent($action, &$entity, $isNew = false, \Symfony\Component\EventDispatcher\Event $event = null)
-    {
+    protected function dispatchEvent(
+        $action,
+        &$entity,
+        $isNew = false,
+        \Symfony\Component\EventDispatcher\Event $event = null
+    ) {
         if ($entity instanceof \Mautic\CampaignBundle\Entity\Lead) {
             return;
         }
@@ -323,7 +341,10 @@ class CampaignModel extends CommonFormModel
         foreach ($events as $id => $e) {
             if (isset($relationships[$id])) {
                 // Has a parent
-                $anchor = in_array($relationships[$id]['decision'], ['yes', 'no']) ? $relationships[$id]['decision'] : null;
+                $anchor = in_array(
+                    $relationships[$id]['decision'],
+                    ['yes', 'no']
+                ) ? $relationships[$id]['decision'] : null;
                 $events[$id]->setDecisionPath($anchor);
 
                 $parentId = $relationships[$id]['parent'];
@@ -357,15 +378,18 @@ class CampaignModel extends CommonFormModel
         //set event order used when querying the events
         $this->buildOrder($hierarchy, $events, $entity);
 
-        uasort($events, function ($a, $b) {
-            $aOrder = $a->getOrder();
-            $bOrder = $b->getOrder();
-            if ($aOrder == $bOrder) {
-                return 0;
-            }
+        uasort(
+            $events,
+            function ($a, $b) {
+                $aOrder = $a->getOrder();
+                $bOrder = $b->getOrder();
+                if ($aOrder == $bOrder) {
+                    return 0;
+                }
 
-            return ($aOrder < $bOrder) ? -1 : 1;
-        });
+                return ($aOrder < $bOrder) ? -1 : 1;
+            }
+        );
 
         // Persist events if campaign is being edited
         if ($entity->getId()) {
@@ -449,13 +473,21 @@ class CampaignModel extends CommonFormModel
             // Check source
             if (strpos($connection['sourceId'], 'new') !== false) {
                 // Find the real one and update the node
-                $connection['sourceId'] = str_replace($connection['sourceId'], $tempIds[$connection['sourceId']], $connection['sourceId']);
+                $connection['sourceId'] = str_replace(
+                    $connection['sourceId'],
+                    $tempIds[$connection['sourceId']],
+                    $connection['sourceId']
+                );
             }
 
             // Check target
             if (strpos($connection['targetId'], 'new') !== false) {
                 // Find the real one and update the node
-                $connection['targetId'] = str_replace($connection['targetId'], $tempIds[$connection['targetId']], $connection['targetId']);
+                $connection['targetId'] = str_replace(
+                    $connection['targetId'],
+                    $tempIds[$connection['targetId']],
+                    $connection['targetId']
+                );
             }
 
             // Rebuild anchors
@@ -540,19 +572,19 @@ class CampaignModel extends CommonFormModel
                     if (isset($event['connectionRestrictions'])) {
                         foreach ($event['connectionRestrictions'] as $restrictionType => $restrictions) {
                             switch ($restrictionType) {
-                                    case 'source':
-                                    case 'target':
-                                        foreach ($restrictions as $groupType => $groupRestrictions) {
-                                            $connectionRestrictions[$key][$restrictionType][$groupType] += $groupRestrictions;
-                                        }
-                                        break;
-                                    case 'anchor':
-                                        foreach ($restrictions as $anchor) {
-                                            list($group, $anchor)                                     = explode('.', $anchor);
-                                            $connectionRestrictions[$restrictionType][$group][$key][] = $anchor;
-                                        }
+                                case 'source':
+                                case 'target':
+                                    foreach ($restrictions as $groupType => $groupRestrictions) {
+                                        $connectionRestrictions[$key][$restrictionType][$groupType] += $groupRestrictions;
+                                    }
+                                    break;
+                                case 'anchor':
+                                    foreach ($restrictions as $anchor) {
+                                        list($group, $anchor)                                     = explode('.', $anchor);
+                                        $connectionRestrictions[$restrictionType][$group][$key][] = $anchor;
+                                    }
 
-                                        break;
+                                    break;
                             }
                         }
                     }
@@ -651,7 +683,8 @@ class CampaignModel extends CommonFormModel
             case null:
                 $choices['lists'] = [];
 
-                $lists = (empty($options['global_only'])) ? $this->leadListModel->getUserLists() : $this->leadListModel->getGlobalLists();
+                $lists = (empty($options['global_only'])) ? $this->leadListModel->getUserLists(
+                ) : $this->leadListModel->getGlobalLists();
 
                 foreach ($lists as $list) {
                     $choices['lists'][$list['id']] = $list['name'];
@@ -759,8 +792,13 @@ class CampaignModel extends CommonFormModel
      *
      * @throws \Doctrine\ORM\ORMException
      */
-    public function addLeads(Campaign $campaign, array $leads, $manuallyAdded = false, $batchProcess = false, $searchListLead = 1)
-    {
+    public function addLeads(
+        Campaign $campaign,
+        array $leads,
+        $manuallyAdded = false,
+        $batchProcess = false,
+        $searchListLead = 1
+    ) {
         foreach ($leads as $lead) {
             if (!$lead instanceof Lead) {
                 $leadId = (is_array($lead) && isset($lead['id'])) ? $lead['id'] : $lead;
@@ -770,15 +808,20 @@ class CampaignModel extends CommonFormModel
             if ($searchListLead == -1) {
                 $campaignLead = null;
             } elseif ($searchListLead) {
-                $campaignLead = $this->getCampaignLeadRepository()->findOneBy([
-                    'lead'     => $lead,
-                    'campaign' => $campaign,
-                ]);
+                $campaignLead = $this->getCampaignLeadRepository()->findOneBy(
+                    [
+                        'lead'     => $lead,
+                        'campaign' => $campaign,
+                    ]
+                );
             } else {
-                $campaignLead = $this->em->getReference('MauticCampaignBundle:Lead', [
-                    'lead'     => $leadId,
-                    'campaign' => $campaign->getId(),
-                ]);
+                $campaignLead = $this->em->getReference(
+                    'MauticCampaignBundle:Lead',
+                    [
+                        'lead'     => $leadId,
+                        'campaign' => $campaign->getId(),
+                    ]
+                );
             }
 
             $dispatchEvent = true;
@@ -861,8 +904,13 @@ class CampaignModel extends CommonFormModel
      *
      * @throws \Doctrine\ORM\ORMException
      */
-    public function removeLeads(Campaign $campaign, array $leads, $manuallyRemoved = false, $batchProcess = false, $skipFindOne = false)
-    {
+    public function removeLeads(
+        Campaign $campaign,
+        array $leads,
+        $manuallyRemoved = false,
+        $batchProcess = false,
+        $skipFindOne = false
+    ) {
         foreach ($leads as $lead) {
             $dispatchEvent = false;
 
@@ -872,14 +920,19 @@ class CampaignModel extends CommonFormModel
             }
 
             $campaignLead = (!$skipFindOne) ?
-                $this->getCampaignLeadRepository()->findOneBy([
-                    'lead'     => $lead,
-                    'campaign' => $campaign,
-                ]) :
-                $this->em->getReference('MauticCampaignBundle:Lead', [
-                    'lead'     => $leadId,
-                    'campaign' => $campaign->getId(),
-                ]);
+                $this->getCampaignLeadRepository()->findOneBy(
+                    [
+                        'lead'     => $lead,
+                        'campaign' => $campaign,
+                    ]
+                ) :
+                $this->em->getReference(
+                    'MauticCampaignBundle:Lead',
+                    [
+                        'lead'     => $leadId,
+                        'campaign' => $campaign->getId(),
+                    ]
+                );
 
             if ($campaignLead == null) {
                 if ($batchProcess) {
@@ -890,7 +943,9 @@ class CampaignModel extends CommonFormModel
                 continue;
             }
 
-            if (($manuallyRemoved && $campaignLead->wasManuallyAdded()) || (!$manuallyRemoved && !$campaignLead->wasManuallyAdded())) {
+            if (($manuallyRemoved && $campaignLead->wasManuallyAdded(
+                    )) || (!$manuallyRemoved && !$campaignLead->wasManuallyAdded())
+            ) {
                 //lead was manually added and now manually removed or was not manually added and now being removed
 
                 // Manually added and manually removed so chuck it
@@ -954,8 +1009,12 @@ class CampaignModel extends CommonFormModel
      *
      * @return int
      */
-    public function rebuildCampaignLeads(Campaign $campaign, $limit = 1000, $maxLeads = false, OutputInterface $output = null)
-    {
+    public function rebuildCampaignLeads(
+        Campaign $campaign,
+        $limit = 1000,
+        $maxLeads = false,
+        OutputInterface $output = null
+    ) {
         defined('MAUTIC_REBUILDING_CAMPAIGNS') or define('MAUTIC_REBUILDING_CAMPAIGNS', 1);
 
         $repo = $this->getRepository();
@@ -989,7 +1048,12 @@ class CampaignModel extends CommonFormModel
         }
 
         if ($output) {
-            $output->writeln($this->translator->trans('mautic.campaign.rebuild.to_be_added', ['%leads%' => $leadCount, '%batch%' => $limit]));
+            $output->writeln(
+                $this->translator->trans(
+                    'mautic.campaign.rebuild.to_be_added',
+                    ['%leads%' => $leadCount, '%batch%' => $limit]
+                )
+            );
         }
 
         // Handle by batches
@@ -1023,28 +1087,22 @@ class CampaignModel extends CommonFormModel
 
                 $start += $limit;
 
-                $processedLeads = [];
-                foreach ($newLeadList as $l) {
-                    $this->addLeads($campaign, [$l], false, true, -1);
-                    $processedLeads[] = $l;
-                    ++$leadsProcessed;
-                    if ($output && $leadsProcessed < $maxCount) {
-                        $progress->setProgress($leadsProcessed);
-                    }
-
-                    unset($l);
-
-                    if ($maxLeads && $leadsProcessed >= $maxLeads) {
-                        break;
-                    }
+                if ($this->queueService->isQueueEnabled()) {
+                    $msg = [
+                        'campaign'    => $campaign,
+                        'newLeadList' => $newLeadList,
+                    ];
+                    $this->queueService->publishToQueue(QueueName::ADD_LEADS_TO_CAMPAIGN, $msg);
+                } else {
+                    $this->addLeadsToCampaign($campaign, $newLeadList);
                 }
 
-                // Dispatch batch event
-                if (count($processedLeads) && $this->dispatcher->hasListeners(CampaignEvents::LEAD_CAMPAIGN_BATCH_CHANGE)) {
-                    $this->dispatcher->dispatch(
-                        CampaignEvents::LEAD_CAMPAIGN_BATCH_CHANGE,
-                        new Events\CampaignLeadChangeEvent($campaign, $processedLeads, 'added')
-                    );
+                $leadsProcessed += count($newLeadList);
+                if ($output && $leadsProcessed < $maxCount) {
+                    $progress->setProgress($leadsProcessed);
+                }
+                if ($maxLeads && $leadsProcessed >= $maxLeads) {
+                    break;
                 }
 
                 unset($newLeadList);
@@ -1084,7 +1142,12 @@ class CampaignModel extends CommonFormModel
         $batchLimiters['maxId'] = $removeLeadCount['maxId'];
 
         if ($output) {
-            $output->writeln($this->translator->trans('mautic.lead.list.rebuild.to_be_removed', ['%leads%' => $leadCount, '%batch%' => $limit]));
+            $output->writeln(
+                $this->translator->trans(
+                    'mautic.lead.list.rebuild.to_be_removed',
+                    ['%leads%' => $leadCount, '%batch%' => $limit]
+                )
+            );
         }
 
         if ($leadCount) {
@@ -1109,26 +1172,24 @@ class CampaignModel extends CommonFormModel
                     ]
                 );
 
-                $processedLeads = [];
-                foreach ($removeLeadList as $l) {
-                    $this->removeLeads($campaign, [$l], false, true, true);
-                    $processedLeads[] = $l;
-                    ++$leadsProcessed;
-                    if ($output && $leadsProcessed < $maxCount) {
-                        $progress->setProgress($leadsProcessed);
-                    }
-
-                    if ($maxLeads && $leadsProcessed >= $maxLeads) {
-                        break;
-                    }
+                if ($this->queueService->isQueueEnabled()) {
+                    $msg = [
+                        'campaign'       => $campaign,
+                        'removeLeadList' => $removeLeadList,
+                    ];
+                    $this->queueService->publishToQueue(QueueName::REMOVE_LEADS_FROM_CAMPAIGN, $msg);
+                } else {
+                    $this->removeLeadsFromCampaign($campaign, $removeLeadList);
                 }
 
-                // Dispatch batch event
-                if (count($processedLeads) && $this->dispatcher->hasListeners(CampaignEvents::LEAD_CAMPAIGN_BATCH_CHANGE)) {
-                    $this->dispatcher->dispatch(
-                        CampaignEvents::LEAD_CAMPAIGN_BATCH_CHANGE,
-                        new Events\CampaignLeadChangeEvent($campaign, $processedLeads, 'removed')
-                    );
+                $leadsProcessed += count($removeLeadList);
+
+                if ($output && $leadsProcessed < $maxCount) {
+                    $progress->setProgress($leadsProcessed);
+                }
+
+                if ($maxLeads && $leadsProcessed >= $maxLeads) {
+                    break;
                 }
 
                 $start += $limit;
@@ -1153,6 +1214,56 @@ class CampaignModel extends CommonFormModel
         }
 
         return $leadsProcessed;
+    }
+
+    /**
+     * @param Campaign $campaign
+     * @param array    $newLeadList
+     */
+    public function addLeadsToCampaign(Campaign $campaign, array $newLeadList)
+    {
+        $processedLeads = [];
+        foreach ($newLeadList as $l) {
+            $this->addLeads($campaign, [$l], false, true, -1);
+            $processedLeads[] = $l;
+
+            unset($l);
+        }
+
+        // Dispatch batch event
+        if (count($processedLeads) && $this->dispatcher->hasListeners(
+                CampaignEvents::LEAD_CAMPAIGN_BATCH_CHANGE
+            )
+        ) {
+            $this->dispatcher->dispatch(
+                CampaignEvents::LEAD_CAMPAIGN_BATCH_CHANGE,
+                new Events\CampaignLeadChangeEvent($campaign, $processedLeads, 'added')
+            );
+        }
+    }
+
+    /**
+     * @param Campaign $campaign
+     * @param array    $removeLeadList
+     */
+    public function removeLeadsFromCampaign(Campaign $campaign, array $removeLeadList)
+    {
+        $processedLeads = [];
+        foreach ($removeLeadList as $l) {
+            $this->removeLeads($campaign, [$l], false, true, true);
+            $processedLeads[] = $l;
+        }
+
+        // Dispatch batch event
+        if (count($processedLeads) && $this->dispatcher->hasListeners(
+                CampaignEvents::LEAD_CAMPAIGN_BATCH_CHANGE
+            )
+        ) {
+            $this->dispatcher->dispatch(
+                CampaignEvents::LEAD_CAMPAIGN_BATCH_CHANGE,
+                new Events\CampaignLeadChangeEvent($campaign, $processedLeads, 'removed')
+            );
+        }
     }
 
     /**
@@ -1285,11 +1396,11 @@ class CampaignModel extends CommonFormModel
                             $failedSq->expr()->eq('fe.log_id', 't.id')
                         );
                     $filter['failed_events'] = [
-                        'subquery' => sprintf('NOT EXISTS (%s)', $failedSq->getSQL())
+                        'subquery' => sprintf('NOT EXISTS (%s)', $failedSq->getSQL()),
                     ];
 
-                    $q                  = $query->prepareTimeDataQuery('campaign_lead_event_log', 'date_triggered', $filter);
-                    $rawData            = $q->execute()->fetchAll();
+                    $q       = $query->prepareTimeDataQuery('campaign_lead_event_log', 'date_triggered', $filter);
+                    $rawData = $q->execute()->fetchAll();
 
                     if (!empty($rawData)) {
                         $triggers = $query->completeTimeData($rawData);

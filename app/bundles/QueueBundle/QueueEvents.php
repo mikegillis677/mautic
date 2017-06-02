@@ -25,11 +25,15 @@ final class QueueEvents
 
     const BUILD_CONFIG = 'mautic.queue_build_config';
 
+    const ADD_LEADS_TO_CAMPAIGN = 'mautic.queue_add_leads_to_campaign';
+
     const EMAIL_HIT = 'mautic.queue_email_hit';
 
     const NEGATIVE_EVENTS_TRIGGER = 'mautic.queue_negative_events_trigger';
 
     const PAGE_HIT = 'mautic.queue_page_hit';
+
+    const REMOVE_LEADS_FROM_CAMPAIGN = 'mautic.queue_remove_leads_from_campaign';
 
     const SCHEDULED_EVENTS_TRIGGER = 'mautic.queue_scheduled_events_trigger';
 

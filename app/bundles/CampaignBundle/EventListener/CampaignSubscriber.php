@@ -13,6 +13,7 @@ namespace Mautic\CampaignBundle\EventListener;
 
 use Mautic\CampaignBundle\CampaignEvents;
 use Mautic\CampaignBundle\Event as Events;
+use Mautic\CampaignBundle\Model\CampaignModel;
 use Mautic\CampaignBundle\Model\EventModel;
 use Mautic\CoreBundle\EventListener\CommonSubscriber;
 use Mautic\CoreBundle\Helper\IpLookupHelper;
@@ -42,20 +43,28 @@ class CampaignSubscriber extends CommonSubscriber
     protected $campaignEventModel;
 
     /**
+     * @var CampaignModel
+     */
+    protected $campaignModel;
+
+    /**
      * CampaignSubscriber constructor.
      *
      * @param IpLookupHelper $ipLookupHelper
      * @param AuditLogModel  $auditLogModel
      * @param EventModel     $campaignEventModel
+     * @param CampaignModel  $campaignModel
      */
     public function __construct(
         IpLookupHelper $ipLookupHelper,
         AuditLogModel $auditLogModel,
-        EventModel $campaignEventModel
+        EventModel $campaignEventModel,
+        CampaignModel $campaignModel
     ) {
         $this->ipLookupHelper     = $ipLookupHelper;
         $this->auditLogModel      = $auditLogModel;
         $this->campaignEventModel = $campaignEventModel;
+        $this->campaignModel      = $campaignModel;
     }
 
     /**
@@ -64,12 +73,14 @@ class CampaignSubscriber extends CommonSubscriber
     public static function getSubscribedEvents()
     {
         return [
-            CampaignEvents::CAMPAIGN_POST_SAVE    => ['onCampaignPostSave', 0],
-            CampaignEvents::CAMPAIGN_POST_DELETE  => ['onCampaignDelete', 0],
-            CampaignEvents::CAMPAIGN_ON_BUILD     => ['onCampaignBuild', 0],
-            QueueEvents::NEGATIVE_EVENTS_TRIGGER  => ['onNegativeEventsTrigger', 0],
-            QueueEvents::SCHEDULED_EVENTS_TRIGGER => ['onScheduledEventsTrigger', 0],
-            QueueEvents::STARTING_EVENTS_TRIGGER  => ['onStartingEventsTrigger', 0],
+            CampaignEvents::CAMPAIGN_POST_SAVE      => ['onCampaignPostSave', 0],
+            CampaignEvents::CAMPAIGN_POST_DELETE    => ['onCampaignDelete', 0],
+            CampaignEvents::CAMPAIGN_ON_BUILD       => ['onCampaignBuild', 0],
+            QueueEvents::NEGATIVE_EVENTS_TRIGGER    => ['onNegativeEventsTrigger', 0],
+            QueueEvents::SCHEDULED_EVENTS_TRIGGER   => ['onScheduledEventsTrigger', 0],
+            QueueEvents::STARTING_EVENTS_TRIGGER    => ['onStartingEventsTrigger', 0],
+            QueueEvents::ADD_LEADS_TO_CAMPAIGN      => ['onAddLeadsToCampaign', 0],
+            QueueEvents::REMOVE_LEADS_FROM_CAMPAIGN => ['onRemoveLeadsFromCampaign', 0],
         ];
     }
 
@@ -218,5 +229,31 @@ class CampaignSubscriber extends CommonSubscriber
             $returnCounts
         );
         $event->setResult(QueueConsumerResults::ACKNOWLEDGE);
+    }
+
+    /**
+     * Add leads to a campaign.
+     *
+     * @param QueueConsumerEvent $event
+     */
+    public function onAddLeadsToCampaign(QueueConsumerEvent $event)
+    {
+        $payload     = $event->getPayload();
+        $campaign    = $payload['campaign'];
+        $newLeadList = $payload['newLeadList'];
+        $this->campaignModel->addLeadsToCampaign($campaign, $newLeadList);
+    }
+
+    /**
+     * Remove leads from a campaign.
+     *
+     * @param QueueConsumerEvent $event
+     */
+    public function onRemoveLeadsFromCampaign(QueueConsumerEvent $event)
+    {
+        $payload        = $event->getPayload();
+        $campaign       = $payload['campaign'];
+        $removeLeadList = $payload['removeLeadList'];
+        $this->campaignModel->removeLeadsFromCampaign($campaign, $removeLeadList);
     }
 }

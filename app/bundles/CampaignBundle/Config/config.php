@@ -126,6 +126,7 @@ return [
                     'mautic.helper.ip_lookup',
                     'mautic.core.model.auditlog',
                     'mautic.campaign.model.event',
+                    'mautic.campaign.model.campaign',
                 ],
             ],
             'mautic.campaign.leadbundle.subscriber' => [
@@ -213,6 +214,7 @@ return [
                     'mautic.lead.model.lead',
                     'mautic.lead.model.list',
                     'mautic.form.model.form',
+                    'mautic.queue.service',
                 ],
             ],
             'mautic.campaign.model.event' => [
