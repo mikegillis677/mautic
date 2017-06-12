@@ -241,6 +241,7 @@ class CampaignSubscriber extends CommonSubscriber
         $payload     = $event->getPayload();
         $campaign    = $payload['campaign'];
         $newLeadList = $payload['newLeadList'];
+        $campaign    = $this->campaignModel->getRepository()->find($campaign->getId());
         $this->campaignModel->addLeadsToCampaign($campaign, $newLeadList);
         $event->setResult(QueueConsumerResults::ACKNOWLEDGE);
     }
@@ -255,6 +256,7 @@ class CampaignSubscriber extends CommonSubscriber
         $payload        = $event->getPayload();
         $campaign       = $payload['campaign'];
         $removeLeadList = $payload['removeLeadList'];
+        $campaign       = $this->campaignModel->getRepository()->find($campaign->getId());
         $this->campaignModel->removeLeadsFromCampaign($campaign, $removeLeadList);
         $event->setResult(QueueConsumerResults::ACKNOWLEDGE);
     }
