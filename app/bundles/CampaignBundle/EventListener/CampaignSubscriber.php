@@ -242,6 +242,7 @@ class CampaignSubscriber extends CommonSubscriber
         $campaign    = $payload['campaign'];
         $newLeadList = $payload['newLeadList'];
         $this->campaignModel->addLeadsToCampaign($campaign, $newLeadList);
+        $event->setResult(QueueConsumerResults::ACKNOWLEDGE);
     }
 
     /**
@@ -255,5 +256,6 @@ class CampaignSubscriber extends CommonSubscriber
         $campaign       = $payload['campaign'];
         $removeLeadList = $payload['removeLeadList'];
         $this->campaignModel->removeLeadsFromCampaign($campaign, $removeLeadList);
+        $event->setResult(QueueConsumerResults::ACKNOWLEDGE);
     }
 }
