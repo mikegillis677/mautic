@@ -976,7 +976,7 @@ class EventModel extends CommonFormModel
             foreach ($events as $leadId => $leadEvents) {
                 foreach ($leadEvents as $eventId => $log) {
                     if ($lastTriggerDate === null) {
-                        $lastTriggerDate = $log['trigger_date'];
+                        $lastTriggerDate = isset($log['trigger_date']) ? $log['trigger_date'] : null;
                     } else {
                         $lastTriggerDate = min($lastTriggerDate, $log['trigger_date']);
                     }
