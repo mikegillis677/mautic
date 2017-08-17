@@ -311,7 +311,7 @@ class EventRepository extends CommonRepository
 
         $q->select('o, IDENTITY(o.lead) as lead_id, IDENTITY(o.event) AS event_id, o.triggerDate AS trigger_date')
             ->orderBy('o.triggerDate', 'DESC')
-            ->addOrderBy('o.lead_id', 'ASC');
+            ->addOrderBy('lead_id', 'ASC');
 
         if ($limit) {
             $q->setFirstResult(0)
