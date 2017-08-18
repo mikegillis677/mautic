@@ -292,11 +292,11 @@ class EventRepository extends CommonRepository
             ->setParameter('true', true, 'boolean');
 
         if ($lastTriggerDate) {
-            $q->andWhere()->expr()->lte('o.triggerDate', ':lastTriggerDate');
+            $q->andWhere($q->expr()->lte('o.triggerDate', ':lastTriggerDate'));
             $q->setParameter('lastTriggerDate', $lastTriggerDate);
         }
         if ($lastLeadId) {
-            $q->andWhere()->expr()->gt('o.leadId', ':lastLeadId');
+            $q->andWhere($q->expr()->gt('IDENTITY(o.lead)', ':lastLeadId'));
             $q->setParameter('lastLeadId', $lastLeadId);
         }
 
@@ -318,6 +318,7 @@ class EventRepository extends CommonRepository
                 ->setMaxResults($limit);
         }
 
+        var_dump($q->getQuery()->getSQL(), $q->getQuery()->getParameters());
         $results = $q->getQuery()->getArrayResult();
 
         // Organize by lead
