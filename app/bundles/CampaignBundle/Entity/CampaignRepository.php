@@ -350,6 +350,7 @@ class CampaignRepository extends CommonRepository
         $countOnly     = (!array_key_exists('countOnly', $args)) ? false : $args['countOnly'];
         $start         = (!array_key_exists('start', $args)) ? false : $args['start'];
         $limit         = (!array_key_exists('limit', $args)) ? false : $args['limit'];
+        $order         = ($countOnly || !array_key_exists('order', $args)) ? false : $args['order'];
 
         $leads = ($countOnly) ? 0 : [];
 
@@ -409,6 +410,10 @@ class CampaignRepository extends CommonRepository
         // Set limits if applied
         if (!empty($limit)) {
             $q->setMaxResults($limit);
+        }
+
+        if (!empty($order)) {
+            $q->orderBy('list_leads.lead_id');
         }
 
         if ($start) {

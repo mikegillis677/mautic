@@ -1082,6 +1082,7 @@ class CampaignModel extends CommonFormModel
                     [
                         'limit'         => $limit,
                         'batchLimiters' => $batchLimiters,
+                        'order'         => true,
                     ]
                 );
 
@@ -1103,6 +1104,10 @@ class CampaignModel extends CommonFormModel
                 }
                 if ($maxLeads && $leadsProcessed >= $maxLeads) {
                     break;
+                }
+
+                if ($this->queueService->isQueueEnabled()) {
+                    $batchLimiters['minId'] = array_reduce($newLeadList, 'max');
                 }
 
                 unset($newLeadList);
