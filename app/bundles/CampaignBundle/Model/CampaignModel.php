@@ -1224,7 +1224,8 @@ class CampaignModel extends CommonFormModel
     {
         $processedLeads = [];
         foreach ($newLeadList as $l) {
-            $this->addLeads($campaign, [$l], false, true, -1);
+            $searchForLeads = $this->queueService->isQueueEnabled() ? 1 : -1;
+            $this->addLeads($campaign, [$l], false, true, $searchForLeads);
             $processedLeads[] = $l;
 
             unset($l);
