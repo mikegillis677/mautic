@@ -1255,8 +1255,10 @@ class CampaignModel extends CommonFormModel
     public function removeLeadsFromCampaign(Campaign $campaign, array $removeLeadList)
     {
         $processedLeads = [];
+        $skipFindOne    = !$this->queueService->isQueueEnabled();
+
         foreach ($removeLeadList as $l) {
-            $this->removeLeads($campaign, [$l], false, true, true);
+            $this->removeLeads($campaign, [$l], false, true, $skipFindOne);
             $processedLeads[] = $l;
         }
 
