@@ -318,7 +318,6 @@ class EventRepository extends CommonRepository
                 ->setMaxResults($limit);
         }
 
-        var_dump($q->getQuery()->getSQL(), $q->getQuery()->getParameters());
         $results = $q->getQuery()->getArrayResult();
 
         // Organize by lead
