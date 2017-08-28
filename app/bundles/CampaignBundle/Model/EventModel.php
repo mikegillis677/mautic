@@ -834,10 +834,10 @@ class EventModel extends CommonFormModel
 
         unset($leads, $campaignLeads);
 
+        $this->triggerConditions($campaign, $evaluatedEventCount, $executedEventCount, $totalEventCount);
+
         // Free some memory
         gc_collect_cycles();
-
-        $this->triggerConditions($campaign, $evaluatedEventCount, $executedEventCount, $totalEventCount);
 
         $counts = [
             'evaluated'      => $rootEvaluatedCount,
@@ -1045,8 +1045,6 @@ class EventModel extends CommonFormModel
             }
 
             ++$batchDebugCounter;
-
-            $this->triggerConditions($campaign, $evaluatedEventCount, $executedEventCount, $totalEventCount);
         }
 
         if ($output) {
@@ -1220,6 +1218,8 @@ class EventModel extends CommonFormModel
         $this->em->clear('Mautic\UserBundle\Entity\User');
         unset($events, $leads);
 
+        $this->triggerConditions($campaign, $evaluatedEventCount, $executedEventCount, $totalEventCount);
+
         // Free some memory
         gc_collect_cycles();
 
@@ -1364,8 +1364,6 @@ class EventModel extends CommonFormModel
                 $progress->finish();
                 $output->writeln('');
             }
-
-            $this->triggerConditions($campaign, $evaluatedEventCount, $executedEventCount, $totalEventCount);
         }
 
         $counts = [
@@ -1665,6 +1663,8 @@ class EventModel extends CommonFormModel
         $this->em->clear('Mautic\UserBundle\Entity\User');
 
         unset($leads, $campaignLeadIds, $leadLog);
+
+        $this->triggerConditions($campaign, $evaluatedEventCount, $executedEventCount, $totalEventCount);
 
         // Free some memory
         gc_collect_cycles();
