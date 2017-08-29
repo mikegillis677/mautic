@@ -42,7 +42,7 @@ trait FrequencyRuleTrait
      *
      * @return bool|Form
      */
-    protected function getFrequencyRuleForm($lead, &$viewParameters = [], &$data = null, $isPublic = false, $action = null)
+    protected function getFrequencyRuleForm($lead, &$viewParameters = [], &$data = null, $isPublic = false, $action = null, $channel = null)
     {
         /** @var LeadModel $model */
         $model = $this->getModel('lead');
@@ -89,7 +89,7 @@ trait FrequencyRuleTrait
 
                 if ($valid) {
                     $data = $form->getData();
-                    $this->persistFrequencyRuleFormData($lead, $data, $allChannels, $leadChannels);
+                    $this->persistFrequencyRuleFormData($lead, $data, $allChannels, $leadChannels, $channel);
 
                     return true;
                 }
@@ -167,9 +167,15 @@ trait FrequencyRuleTrait
      * @param array $formData
      * @param array $allChannels
      * @param       $leadChannels
+     * @param null  $channelDetails
      */
-    protected function persistFrequencyRuleFormData(Lead $lead, array $formData, array $allChannels, $leadChannels)
-    {
+    protected function persistFrequencyRuleFormData(
+        Lead $lead,
+        array $formData,
+        array $allChannels,
+        $leadChannels,
+        $channelDetails = null
+    ) {
         /** @var LeadModel $model */
         $model = $this->getModel('lead');
 
@@ -186,6 +192,9 @@ trait FrequencyRuleTrait
         $dncChannels = array_diff($allChannels, $formData['subscribed_channels']);
         if (!empty($dncChannels)) {
             foreach ($dncChannels as $channel) {
+                if (isset($channelDetails[$channel])) {
+                    $channel = [$channel => $channelDetails[$channel]];
+                }
                 $model->addDncForLead($lead, $channel, 'user', ($this->isPublicView) ? DoNotContact::UNSUBSCRIBED : DoNotContact::MANUAL);
             }
         }

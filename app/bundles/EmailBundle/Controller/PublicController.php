@@ -21,6 +21,7 @@ use Mautic\EmailBundle\Helper\MailHelper;
 use Mautic\EmailBundle\Swiftmailer\Transport\InterfaceCallbackTransport;
 use Mautic\LeadBundle\Controller\FrequencyRuleTrait;
 use Mautic\LeadBundle\Entity\DoNotContact;
+use Mautic\LeadBundle\Entity\Lead;
 use Mautic\QueueBundle\Queue\QueueName;
 use Symfony\Component\HttpFoundation\Response;
 
@@ -102,7 +103,7 @@ class PublicController extends CommonFormController
      */
     public function trackingImageAction($idHash)
     {
-        $logger = $this->get('monolog.logger.mautic');
+        $logger       = $this->get('monolog.logger.mautic');
         $queueService = $this->get('mautic.queue.service');
         if ($queueService->isQueueEnabled()) {
             $logger->log('info', 'using the queue');
@@ -216,7 +217,13 @@ class PublicController extends CommonFormController
                     'showContactSegments'          => $this->get('mautic.helper.core_parameters')->getParameter('show_contact_segments'),
                 ];
 
-                $form = $this->getFrequencyRuleForm($lead, $viewParameters, $data, true, $action);
+                $channel = null;
+                if ($stat->getLead() instanceof Lead) {
+                    $email   = $stat->getEmail();
+                    $channel = ($email) ? ['email' => $email->getId()] : 'email';
+                }
+
+                $form = $this->getFrequencyRuleForm($lead, $viewParameters, $data, true, $action, $channel);
                 if (true === $form) {
                     return $this->postActionRedirect(
                         [
