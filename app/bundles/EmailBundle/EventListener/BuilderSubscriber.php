@@ -254,7 +254,7 @@ class BuilderSubscriber extends CommonSubscriber
         }
 
         $unsubscribeText = $this->coreParametersHelper->getParameter('unsubscribe_text');
-        if (!$unsubscribeText || $lead['preferred_locale'] != $this->translator->getLocale()) {
+        if (!$unsubscribeText || ($lead['preferred_locale'] && $lead['preferred_locale'] != $this->translator->getLocale())) {
             $unsubscribeText = $this->translator->trans(
                 'mautic.email.unsubscribe.text',
                 ['%link%' => '|URL|'],
@@ -268,7 +268,7 @@ class BuilderSubscriber extends CommonSubscriber
         $event->addToken('{unsubscribe_url}', $this->emailModel->buildUrl('mautic_email_unsubscribe', ['idHash' => $idHash]));
 
         $webviewText = $this->coreParametersHelper->getParameter('webview_text');
-        if (!$webviewText || $lead['preferred_locale'] != $this->translator->getLocale()) {
+        if (!$webviewText || ($lead['preferred_locale'] && $lead['preferred_locale'] != $this->translator->getLocale())) {
             $webviewText = $this->translator->trans(
                 'mautic.email.webview.text',
                 ['%link%' => '|URL|'],
